@@ -338,7 +338,7 @@ end
 -- Adapted binary check from:
 -- https://github.com/nvim-telescope/telescope.nvim/blob/5255aa27c422de944791318024167ad5d40aad20/lua/telescope/health.lua#L35-L50
 --
--- @param package (table) Program table with name and optional binary table
+-- @param program (table) Program table with name and optional binaries table
 -- @return (table) Table content: {exists, binary, version}
 --
 M.check_binary_installed = function(program)
