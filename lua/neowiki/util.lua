@@ -339,7 +339,7 @@ end
 -- https://github.com/nvim-telescope/telescope.nvim/blob/5255aa27c422de944791318024167ad5d40aad20/lua/telescope/health.lua#L35-L50
 --
 -- @param program (table) Program table with name and optional binaries table
--- @return (table) Table content: {exists, binary, version}
+-- @return (table) Table content: {exists, binary}
 --
 M.check_binary_installed = function(program)
   local binaries = program.binaries or { program.name }
@@ -350,10 +350,7 @@ M.check_binary_installed = function(program)
       found = vim.fn.executable(binary) == 1
     end
     if found then
-      local handle = io.popen(binary .. " --version")
-      local binary_version = handle:read "*a"
-      handle:close()
-      return { exists = true, binary = binary, version = binary_version }
+      return { exists = true, binary = binary }
     end
   end
 end
