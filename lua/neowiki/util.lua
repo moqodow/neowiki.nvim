@@ -345,7 +345,7 @@ M.check_binary_installed = function(program)
   local binaries = program.binaries or { program.name }
   for _, binary in ipairs(binaries) do
     local found = vim.fn.executable(binary) == 1
-    if not found and is_win then
+    if not found and is_windows then
       binary = binary .. ".exe"
       found = vim.fn.executable(binary) == 1
     end
