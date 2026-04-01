@@ -18,7 +18,7 @@ local rg = util.check_binary_installed(tools.rg)
 -- Generic file finder that uses fast command-line tool (rg) if available.
 -- All returned paths are made absolute.
 -- @param search_path (string) The absolute path of the directory to search.
--- @param search_term (string) The filename or extension to find.
+-- @param search_term (string|table) The filename string (for 'name') or table of patterns (for 'ext').
 -- @param search_type (string) 'name' to find by exact filename, or 'ext' for extension.
 -- @return (table) A list of absolute paths to the found files.
 --
@@ -28,12 +28,18 @@ local find_files = function(search_path, search_term, search_type)
   local glob_pattern
 
   if rg then
+    command = { rg.binary, "--files", "--no-follow", "--crlf" }
     if search_type == "ext" then
-      glob_pattern = "*" .. search_term
+      for _, pat in ipairs(search_term) do
+        table.insert(command, "--iglob")
+        table.insert(command, pat)
+      end
     else -- 'name'
-      glob_pattern = search_term
+      table.insert(command, "--iglob")
+      table.insert(command, search_term)
     end
-    command = { rg.binary, "--files", "--no-follow", "--crlf", "--iglob", glob_pattern, search_path }
+    table.insert(command, search_path)
+
     files = vim.fn.systemlist(command)
     if vim.v.shell_error == 0 then
       -- rg can return relative paths; ensure they are absolute.
@@ -56,23 +62,28 @@ local find_files = function(search_path, search_term, search_type)
   end
 
   if search_type == "ext" then
-    glob_pattern = "**/*" .. search_term
+    local results = {}
+    for _, pat in ipairs(search_term) do
+      glob_pattern = "**/" .. pat
+      local matches = vim.fn.globpath(search_path, glob_pattern, false, true)
+      vim.list_extend(results, matches)
+    end
+    return results
   else -- 'name'
     glob_pattern = "**/" .. search_term
+    -- globpath returns absolute paths when the base path is absolute.
+    return vim.fn.globpath(search_path, glob_pattern, false, true)
   end
-  -- globpath returns absolute paths when the base path is absolute.
-  return vim.fn.globpath(search_path, glob_pattern, false, true)
 end
 
 ---
 -- Finds all wiki pages within a directory by calling the generic file finder.
 -- @param search_path (string) The absolute path of the directory to search.
--- @param extension (string) The file extension to look for (e.g., ".md").
 -- @return (table) A list of absolute paths to the found wiki pages.
 --
-M.find_wiki_pages = function(search_path, extension)
-  -- Delegate to the main file-finding function with 'ext' type.
-  return find_files(search_path, extension, "ext")
+M.find_wiki_pages = function(search_path)
+  -- Delegate to the main file-finding function with 'ext' type and dynamic patterns.
+  return find_files(search_path, config.markdown_patterns, "ext")
 end
 
 ---
@@ -161,10 +172,17 @@ M.find_backlinks = function(search_path, target_filename)
   local fname_no_ext = vim.fn.fnamemodify(target_filename, ":t:r")
   local fname_pattern = fname_no_ext:gsub("([%(%)%.%+%[%]])", "\\%1"):gsub("/", "[\\/]")
 
-  local ext = state.markdown_extension or ".md"
-  local ext_pattern = ext:gsub("%.", "\\.") -- Turns ".md" into "\.md"
+  -- Dynamically build the regex group for all valid extensions
+  local valid_exts = {}
+  for _, pattern in ipairs(config.markdown_patterns) do
+    local ext_part = pattern:match("%*%.(.+)")
+    if ext_part then
+      table.insert(valid_exts, "\\." .. ext_part)
+    end
+  end
 
-  local strict_target_content = "(?:[\\w./\\\\]*)" .. fname_pattern .. "(?:" .. ext_pattern .. ")?"
+  local dynamic_ext_pattern = "(?:" .. table.concat(valid_exts, "|") .. ")?"
+  local strict_target_content = "(?:[\\w./\\\\]*)" .. fname_pattern .. dynamic_ext_pattern
   local wikilink_format = "\\[\\[%s\\]\\]"
   local mdlink_format = "\\[[^\\]]+\\]\\(%s\\)"
   local wikilink_part = string.format(wikilink_format, strict_target_content)
