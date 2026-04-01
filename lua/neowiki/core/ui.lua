@@ -313,9 +313,7 @@ M.prompt_rename_input = function(default_name, callback)
       return callback(nil) -- Abort cleanly
     end
     local sanitized_input = util.sanitize_filename(input)
-    local new_filename = (vim.fn.fnamemodify(sanitized_input, ":e") == "")
-        and (input .. state.markdown_extension)
-      or input
+    local new_filename = util.ensure_extension(sanitized_input, state.markdown_extension)
     callback({ new_filename = new_filename })
   end)
 end
